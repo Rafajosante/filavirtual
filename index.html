@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fila Virtual</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f3f4f6; text-align: center; margin: 0; padding: 20px; }
+        .box { background: white; max-width: 500px; margin: 0 auto; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px;}
+        input, button { padding: 10px; margin: 5px 0; width: 90%; border-radius: 5px; border: 1px solid #ccc; font-size: 16px;}
+        button { background: #4F46E5; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background: #4338ca; }
+        .admin-btn { background: #ef4444; }
+        .admin-btn:hover { background: #dc2626; }
+        h1, h2 { color: #1f2937; }
+        .senha-destaque { font-size: 40px; color: #4F46E5; margin: 10px 0; }
+        ul { list-style: none; padding: 0; text-align: left; }
+        li { padding: 10px; border-bottom: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+
+    <!-- VISÃO DO CLIENTE -->
+    <div class="box">
+        <h2>Painel do Cliente</h2>
+        <input type="text" id="nome" placeholder="Digite seu nome">
+        <button onclick="entrarNaFila()">Pegar Senha</button>
+        <hr>
+        <p>Sua Senha:</p>
+        <div class="senha-destaque" id="minhaSenha">--</div>
+        <p id="statusCliente">Aguardando...</p>
+    </div>
+
+    <!-- VISÃO DO ESTABELECIMENTO -->
+    <div class="box" style="border: 2px solid #ef4444;">
+        <h2>Painel do Estabelecimento</h2>
+        <p>Chamando Agora: <strong style="font-size: 24px; color: #ef4444;" id="chamando">--</strong></p>
+        <button class="admin-btn" onclick="chamarProximo()">Chamar Próximo</button>
+        
+        <h3>Pessoas na fila:</h3>
+        <ul id="listaFila"></ul>
+
+        <button style="background: #111; margin-top: 20px;" onclick="resetarFila()">Encerrar Dia (Limpar Fila)</button>
+    </div>
+
+    <script>
+      
+
+       let minhaSenhaId = null;
+
+        async function carregarFila() {
+            // Mudamos de http://localhost:3000/api... para apenas /api...
+            const res = await fetch('/api/queue');
+            const data = await res.json();
+
+            document.getElementById('chamando').innerText = data.currentlyCalling || "--";
+            
+            const lista = document.getElementById('listaFila');
+            lista.innerHTML = '';
+            data.waiting.forEach(pessoa => {
+                lista.innerHTML += `<li>Senha <b>${pessoa.id}</b> - ${pessoa.name}</li>`;
+            });
+
+            if (minhaSenhaId) {
+                document.getElementById('minhaSenha').innerText = minhaSenhaId;
+                if (data.currentlyCalling == minhaSenhaId) {
+                    document.getElementById('statusCliente').innerHTML = "<strong style='color:green'>VÁ PARA O ATENDIMENTO!</strong>";
+                }
+            }
+        }
+
+        async function entrarNaFila() {
+            const nome = document.getElementById('nome').value;
+            if(!nome) return alert("Digite o nome!");
+            const res = await fetch('/api/join', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: nome })
+            });
+            const data = await res.json();
+            minhaSenhaId = data.ticketId;
+            document.getElementById('nome').value = '';
+            carregarFila();
+        }
+
+        async function chamarProximo() {
+            await fetch('/api/call', { method: 'POST' });
+            carregarFila();
+        }
+
+        async function resetarFila() {
+            await fetch('/api/reset', { method: 'POST' });
+            minhaSenhaId = null;
+            document.getElementById('minhaSenha').innerText = "--";
+            document.getElementById('statusCliente').innerText = "Aguardando...";
+            carregarFila();
+        }
+
+        setInterval(carregarFila, 2000);
+        carregarFila();
+    </script>
+</body>
+</html>
